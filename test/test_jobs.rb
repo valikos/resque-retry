@@ -83,6 +83,19 @@ class DelayedJobWithRetryQueue
   end
 end
 
+class JobRetryWithSpecificQueue
+  extend Resque::Plugins::Retry
+  @queue = :testing
+
+  def self.specific_queue(argument)
+    "testing-#{argument}"
+  end
+
+  def self.perform(*args)
+    raise
+  end
+end
+
 class InheritTestJob < RetryDefaultsJob
 end
 

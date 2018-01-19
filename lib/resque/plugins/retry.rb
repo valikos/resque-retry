@@ -110,6 +110,15 @@ module Resque
         ['resque-retry', name, retry_identifier(*args)].compact.join(':').gsub(/\s/, '')
       end
 
+      # Builds the specific queue name for retrying job.
+      #
+      # @return [String] queue identifier
+      #
+      # @api public
+      def specific_queue(*args)
+        nil
+      end
+
       # Maximum number of retrys we can attempt to successfully perform the job
       #
       # A retry limit of 0 will *never* retry.
@@ -401,12 +410,21 @@ module Resque
         Resque.redis.setnx(redis_retry_key(*args), -1)
 
         retry_args = retry_args_for_exception(exception, *args)
+        retry_in_specific_queue = specific_queue(*retry_args)
 
         if temp_retry_delay <= 0
           # If the delay is 0, no point passing it through the scheduler
-          Resque.enqueue(retry_in_queue, *retry_args)
+          if retry_in_specific_queue
+            Resque.enqueue_to(retry_in_specific_queue, retry_in_queue, *retry_args)
+          else
+            Resque.enqueue(retry_in_queue, *retry_args)
+          end
         else
-          Resque.enqueue_in(temp_retry_delay, retry_in_queue, *retry_args)
+          if retry_in_specific_queue
+            Resque.enqueue_in_with_queue(retry_in_specific_queue, temp_retry_delay, retry_in_queue, *retry_args)
+          else
+            Resque.enqueue_in(temp_retry_delay, retry_in_queue, *retry_args)
+          end
         end
 
         # remove retry key from redis if we handed retry off to another queue.
